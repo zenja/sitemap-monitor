@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -11,14 +12,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Search, RefreshCw, Download, Calendar } from "lucide-react";
-import { NewUrlsResult } from "./types";
-import { sites } from "@/lib/drizzle/schema";
 import { format } from "date-fns";
 import { zhCN } from "date-fns/locale";
+import { Calendar, RefreshCw, Search } from "lucide-react";
+import { useEffect, useState } from "react";
 import NewUrlsTable from "./new-urls-table";
+import { NewUrlsResult } from "./types";
 
 interface NewUrlsQueryProps {
   userId: string;
@@ -30,10 +29,11 @@ export default function NewUrlsQuery({ userId }: NewUrlsQueryProps) {
   const [startDate, setStartDate] = useState<string>(today);
   const [endDate, setEndDate] = useState<string>(today);
   const [selectedSiteId, setSelectedSiteId] = useState<string>("all");
-  const [sites, setSites] = useState<sites[]>([]);
+  const [sites, setSites] = useState<any[]>([]);
   const [queryResults, setQueryResults] = useState<NewUrlsResult | null>(null);
   const [dateMode, setDateMode] = useState<"single" | "range">("single");
   const [selectedFilterSites, setSelectedFilterSites] = useState<Set<string>>(new Set());
+  const [urlFilter, setUrlFilter] = useState<string>("");
 
   useEffect(() => {
     // 获取用户站点列表
@@ -106,6 +106,7 @@ export default function NewUrlsQuery({ userId }: NewUrlsQueryProps) {
     setSelectedSiteId("all");
     setQueryResults(null);
     setSelectedFilterSites(new Set());
+    setUrlFilter("");
     setDateMode("single");
   };
 
@@ -304,9 +305,22 @@ export default function NewUrlsQuery({ userId }: NewUrlsQueryProps) {
         {/* Results Table */}
         {queryResults && (
           <div className="mt-6">
+            {/* URL过滤输入框 */}
+            <div className="mb-4 space-y-2">
+              <Label htmlFor="url-filter">URL地址过滤</Label>
+              <Input
+                id="url-filter"
+                type="text"
+                placeholder="输入URL关键字进行过滤..."
+                value={urlFilter}
+                onChange={(e) => setUrlFilter(e.target.value)}
+                className="max-w-md"
+              />
+            </div>
             <NewUrlsTable
               initialResults={queryResults}
               siteFilters={selectedFilterSites}
+              urlFilter={urlFilter}
             />
           </div>
         )}

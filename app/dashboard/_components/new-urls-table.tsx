@@ -18,11 +18,13 @@ import { zhCN } from "date-fns/locale";
 interface NewUrlsTableProps {
   initialResults?: NewUrlsResult;
   siteFilters?: Set<string>;
+  urlFilter?: string;
 }
 
 export default function NewUrlsTable({
   initialResults,
-  siteFilters = new Set()
+  siteFilters = new Set(),
+  urlFilter = ""
 }: NewUrlsTableProps) {
   const [results, setResults] = useState<NewUrlsResult | null>(initialResults || null);
   const [currentPage, setCurrentPage] = useState(1);
@@ -36,7 +38,7 @@ export default function NewUrlsTable({
   // Reset to page 1 when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [siteFilters]);
+  }, [siteFilters, urlFilter]);
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
@@ -60,35 +62,43 @@ export default function NewUrlsTable({
     return url.substring(0, maxLength) + "...";
   };
 
-  // Filter URLs based on selected site filters
+  // Filter URLs based on selected site filters and URL filter
   const getFilteredUrls = () => {
-    if (!results || siteFilters.size === 0) {
-      return results?.urls || [];
+    if (!results) return [];
+
+    let filteredUrls = results.urls;
+
+    // Apply site filters if any
+    if (siteFilters.size > 0) {
+      filteredUrls = filteredUrls.filter(url => siteFilters.has(url.siteId));
     }
 
-    return results.urls.filter(url => siteFilters.has(url.siteId));
+    // Apply URL filter if any
+    if (urlFilter.trim()) {
+      const searchTerm = urlFilter.toLowerCase().trim();
+      filteredUrls = filteredUrls.filter(url =>
+        url.url.toLowerCase().includes(searchTerm)
+      );
+    }
+
+    return filteredUrls;
   };
 
   const getFilteredResults = () => {
     if (!results) return null;
 
-    let allUrls = results.urls;
-
-    // Apply site filters if any
-    if (siteFilters.size > 0) {
-      allUrls = results.urls.filter(url => siteFilters.has(url.siteId));
-    }
-
+    const allUrls = getFilteredUrls();
     const pageSize = 20;
     const startIndex = (currentPage - 1) * pageSize;
     const endIndex = startIndex + pageSize;
     const paginatedUrls = allUrls.slice(startIndex, endIndex);
+    const hasFilters = siteFilters.size > 0 || urlFilter.trim();
 
     return {
       urls: paginatedUrls,
-      totalCount: siteFilters.size > 0 ? allUrls.length : results.totalCount,
+      totalCount: hasFilters ? allUrls.length : results.totalCount,
       currentPage: currentPage,
-      totalPages: Math.ceil(siteFilters.size > 0 ? allUrls.length / pageSize : results.totalPages)
+      totalPages: Math.ceil(hasFilters ? allUrls.length / pageSize : results.totalPages)
     };
   };
 
@@ -165,12 +175,12 @@ export default function NewUrlsTable({
     return (
       <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-4">
         <div className="text-sm text-gray-600 text-center sm:text-left">
-          {siteFilters.size > 0 && (
+          {(siteFilters.size > 0 || urlFilter.trim()) && (
             <span className="text-blue-600 font-medium">筛选结果: </span>
           )}
           显示第 {((currentPage - 1) * 20) + 1} - {Math.min(currentPage * 20, filteredResults.totalCount)} 条，
           共 {filteredResults.totalCount} 条记录
-          {siteFilters.size > 0 && (
+          {(siteFilters.size > 0 || urlFilter.trim()) && (
             <span className="text-blue-600 font-medium ml-2">
               (从 {results?.totalCount || 0} 条中筛选)
             </span>
@@ -202,7 +212,7 @@ export default function NewUrlsTable({
   const filteredResults = getFilteredResults();
 
   if (!filteredResults || filteredResults.urls.length === 0) {
-    const hasFilters = siteFilters.size > 0;
+    const hasFilters = siteFilters.size > 0 || urlFilter.trim();
     return (
       <div className="py-12 text-center border-t">
         <div className="text-gray-500">
