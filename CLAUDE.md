@@ -210,3 +210,6 @@ site_groups (organize sites)
 - Use the existing component library (Radix UI based)
 - Follow the established naming conventions and file organization
 - Implement proper accessibility features following Radix UI patterns
+
+### Verifying Changes
+- When verifying changes, don't build the project as it will damage my local development server running via `pnpm dev`. Instead, test changes directly in the development server, if you really need to test on server.
