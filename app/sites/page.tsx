@@ -10,6 +10,7 @@ import {
 import { SitesApiPanel } from "./_components/api-panel";
 import { TagFilter } from "./_components/tag-filter";
 import { GroupFilter } from "./_components/group-filter";
+import { ScanAllSitesButton } from "./_components/ScanAllSitesButton";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -173,6 +174,7 @@ export default async function SitesPage({
               导出 CSV
             </Button>
           </a>
+          <ScanAllSitesButton />
         </div>
       </div>
 

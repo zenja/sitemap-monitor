@@ -17,7 +17,7 @@ import {
   notificationChannels,
   siteGroups,
 } from "@/lib/drizzle/schema";
-import { desc, and, eq, gte, lte } from "drizzle-orm";
+import { desc, and, eq, gte, lte, inArray, or, sql } from "drizzle-orm";
 import { SESSION_COOKIE_NAME } from "@/lib/auth/session";
 import type { SQL } from "drizzle-orm";
 
@@ -672,6 +672,146 @@ app.post("/sites/import", async (c) => {
     }
   }
   return c.json({ ok: true, imported: successCount, results });
+});
+
+app.post("/sites/scan-all", async (c) => {
+  const ownerId = c.get("userId");
+  const db = c.get("db") ?? (resolveDb() as any);
+
+  const schema = z.object({
+    scope: z.enum(["all", "filtered", "current"]).default("all"),
+    filters: z.object({
+      tags: z.array(z.string()).optional(),
+      groupId: z.string().optional(),
+    }).optional(),
+  });
+
+  const body = schema.parse(await c.req.json());
+  const { scope, filters } = body;
+
+  // 获取用户的所有站点
+  let sitesQuery = db
+    .select({
+      id: sites.id,
+      rootUrl: sites.rootUrl,
+      enabled: sites.enabled,
+    })
+    .from(sites)
+    .where(and(eq(sites.ownerId, ownerId), eq(sites.enabled, true)));
+
+  // 根据过滤条件筛选站点
+  if (scope === "filtered" && filters) {
+    if (filters.tags && filters.tags.length > 0) {
+      // 简单的 JSON 标签过滤
+      const tagConditions = filters.tags.map(tag =>
+        sql`${sites.tags}::text LIKE ${`%${tag}%`}`
+      );
+      sitesQuery = sitesQuery.where(and(
+        eq(sites.ownerId, ownerId),
+        eq(sites.enabled, true),
+        or(...tagConditions)
+      ));
+    }
+    if (filters.groupId) {
+      sitesQuery = sitesQuery.where(and(
+        eq(sites.ownerId, ownerId),
+        eq(sites.enabled, true),
+        eq(sites.groupId, filters.groupId)
+      ));
+    }
+  }
+
+  const allSites = await sitesQuery.orderBy(desc(sites.createdAt));
+
+  // 如果是当前页面范围，暂时使用所有站点（前端可以传递具体站点ID列表）
+  const sitesToProcess = scope === "current" ? allSites : allSites;
+
+  let queuedCount = 0;
+  let skippedCount = 0;
+  const errors: string[] = [];
+  const details: Array<{
+    siteId: string;
+    rootUrl: string;
+    status: "queued" | "skipped";
+    reason?: string;
+    scanId?: string;
+  }> = [];
+
+  // 批量检查现有扫描状态
+  const siteIds = sitesToProcess.map(site => site.id);
+  const existingScans = await db
+    .select()
+    .from(scans)
+    .where(inArray(scans.siteId, siteIds));
+
+  // 创建站点到现有扫描的映射
+  const siteToActiveScans = new Map<string, any>();
+  for (const scan of existingScans) {
+    if (scan.status === "running" || scan.status === "queued") {
+      siteToActiveScans.set(scan.siteId, scan);
+    }
+  }
+
+  // 为每个站点尝试排队扫描
+  for (const site of sitesToProcess) {
+    try {
+      const activeScan = siteToActiveScans.get(site.id);
+
+      if (activeScan) {
+        // 跳过已有活跃扫描的站点
+        skippedCount++;
+        details.push({
+          siteId: site.id,
+          rootUrl: site.rootUrl,
+          status: "skipped",
+          reason: `already_${activeScan.status}`,
+          scanId: activeScan.id,
+        });
+      } else {
+        // 使用现有的 enqueueScan 函数排队扫描
+        const result = await enqueueScan(site.id);
+
+        if (result.status === "already_running") {
+          skippedCount++;
+          details.push({
+            siteId: site.id,
+            rootUrl: site.rootUrl,
+            status: "skipped",
+            reason: result.status,
+            scanId: result.scanId,
+          });
+        } else {
+          queuedCount++;
+          details.push({
+            siteId: site.id,
+            rootUrl: site.rootUrl,
+            status: "queued",
+            scanId: result.scanId,
+          });
+        }
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      errors.push(`${site.rootUrl}: ${errorMessage}`);
+      details.push({
+        siteId: site.id,
+        rootUrl: site.rootUrl,
+        status: "skipped",
+        reason: "error",
+      });
+    }
+  }
+
+  return c.json({
+    ok: true,
+    queued: queuedCount,
+    skipped: skippedCount,
+    total: sitesToProcess.length,
+    errors,
+    details,
+    scope,
+    message: `成功将 ${queuedCount} 个站点加入扫描队列，跳过 ${skippedCount} 个已有活跃扫描的站点`,
+  });
 });
 
 export const GET = handle(app);
