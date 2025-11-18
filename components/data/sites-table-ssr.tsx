@@ -19,6 +19,7 @@ export type SitesTableRow = {
   groupId?: string | null;
   groupName?: string | null;
   groupColor?: string | null;
+  urlCount?: number | null;
 };
 
 export function SitesTableSSR({
@@ -105,6 +106,17 @@ export function SitesTableSSR({
                     </svg>
                     分组
                   </div>
+                </th>
+                <th className="h-12 px-4 text-left font-medium text-muted-foreground">
+                  <a
+                    className="inline-flex items-center gap-2 hover:text-foreground transition-colors"
+                    href={`/sites?page=1&pageSize=${pageSize}&sort=urlCount&dir=${nextDir("urlCount")}`}
+                  >
+                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9v-9m0-9v9" />
+                    </svg>
+                    URL数量 {sortIcon("urlCount")}
+                  </a>
                 </th>
                 <th className="h-12 px-4 text-left font-medium text-muted-foreground">
                   <div className="flex items-center gap-2">
@@ -199,6 +211,16 @@ export function SitesTableSSR({
                     )}
                   </td>
                   <td className="p-4">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-foreground">
+                        {r.urlCount ?? 0}
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        个URL
+                      </span>
+                    </div>
+                  </td>
+                  <td className="p-4">
                     {parseTags(r.tags).length ? (
                       <div className="flex flex-wrap gap-1">
                         {parseTags(r.tags).slice(0, 3).map((tag) => (
@@ -223,7 +245,7 @@ export function SitesTableSSR({
               ))}
               {data.length === 0 && (
                 <tr>
-                  <td className="p-0" colSpan={7}>
+                  <td className="p-0" colSpan={8}>
                     <EmptyState
                       title="暂无站点数据"
                       description="开始添加您的第一个站点进行监控"

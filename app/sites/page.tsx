@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { resolveDb } from "@/lib/db";
-import { sites, siteGroups } from "@/lib/drizzle/schema";
+import { sites, siteGroups, urls } from "@/lib/drizzle/schema";
 import { requireUser } from "@/lib/auth/session";
 import { sql, asc, desc, and, eq } from "drizzle-orm";
 import {
@@ -36,12 +36,13 @@ function getInt(
   return Number.isFinite(n) && n > 0 ? n : def;
 }
 
-const SORTABLE_COLUMNS = ["rootUrl", "createdAt"] as const;
+const SORTABLE_COLUMNS = ["rootUrl", "createdAt", "urlCount"] as const;
 type SortKey = (typeof SORTABLE_COLUMNS)[number];
 
 const ORDER_COLUMNS = {
   rootUrl: sites.rootUrl,
   createdAt: sites.createdAt,
+  urlCount: sql<number>`(SELECT COUNT(*) FROM ${urls} WHERE ${urls.siteId} = ${sites.id} AND ${urls.status} = 'active')`,
 } as const;
 
 export default async function SitesPage({
@@ -75,7 +76,7 @@ export default async function SitesPage({
   const groupParam = getParam(params, "group", "");
 
   const page = getInt(params, "page", 1);
-  const pageSize = Math.min(getInt(params, "pageSize", 10), 50);
+  const pageSize = Math.min(getInt(params, "pageSize", 10), 100);
   const sortParam = getParam(params, "sort", "createdAt");
   const sort: SortKey = SORTABLE_COLUMNS.includes(sortParam as SortKey)
     ? ((sortParam ?? "createdAt") as SortKey)
@@ -112,6 +113,7 @@ export default async function SitesPage({
       groupId: sites.groupId,
       groupName: siteGroups.name,
       groupColor: siteGroups.color,
+      urlCount: sql<number>`(SELECT COUNT(*) FROM ${urls} WHERE ${urls.siteId} = ${sites.id} AND ${urls.status} = 'active')`.as('urlCount'),
     })
     .from(sites)
     .leftJoin(siteGroups, eq(siteGroups.id, sites.groupId))
