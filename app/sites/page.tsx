@@ -1,18 +1,18 @@
-import Link from "next/link";
-import { resolveDb } from "@/lib/db";
-import { sites, siteGroups, urls } from "@/lib/drizzle/schema";
-import { requireUser } from "@/lib/auth/session";
-import { sql, asc, desc, and, eq } from "drizzle-orm";
 import {
-  SitesTableSSR,
-  type SitesTableRow,
+    SitesTableSSR,
+    type SitesTableRow,
 } from "@/components/data/sites-table-ssr";
-import { SitesApiPanel } from "./_components/api-panel";
-import { TagFilter } from "./_components/tag-filter";
-import { GroupFilter } from "./_components/group-filter";
-import { ScanAllSitesButton } from "./_components/ScanAllSitesButton";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { requireUser } from "@/lib/auth/session";
+import { resolveDb } from "@/lib/db";
+import { siteGroups, sites, urls } from "@/lib/drizzle/schema";
+import { and, asc, desc, eq, sql } from "drizzle-orm";
+import Link from "next/link";
+import { SitesApiPanel } from "./_components/api-panel";
+import { GroupFilter } from "./_components/group-filter";
+import { ScanAllSitesButton } from "./_components/ScanAllSitesButton";
+import { TagFilter } from "./_components/tag-filter";
 
 
 export const dynamic = "force-dynamic";
@@ -196,6 +196,28 @@ export default async function SitesPage({
             </p>
           </CardContent>
         </Card>
+
+        <Card className="hover-lift">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">总链接数</CardTitle>
+            <svg className="h-4 w-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+            </svg>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {await db
+                .select({ count: sql<number>`count(*)` })
+                .from(urls)
+                .innerJoin(sites, eq(urls.siteId, sites.id))
+                .where(and(eq(sites.ownerId, user.id), eq(urls.status, "active")))
+                .then((res: any[]) => res[0]?.count ?? 0)}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              所有站点的有效链接
+            </p>
+          </CardContent>
+        </Card>
         
         <Card className="hover-lift">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -226,6 +248,7 @@ export default async function SitesPage({
             </p>
           </CardContent>
         </Card>
+
         <Card className="hover-lift">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">站点分组</CardTitle>
